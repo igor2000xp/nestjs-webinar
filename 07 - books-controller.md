@@ -24,7 +24,7 @@ export class BooksController {
         return 'This action returns all books';
     }
     @Get('my')
-    deleteMyBooks() {
+    getMyBooks() {
         return 'This action delete all my books';
     }
 }
@@ -33,7 +33,7 @@ export class BooksController {
 В этом примере:
  - **@Controller('books')**: Декоратор, который помечает класс как контроллер и определяет базовый маршрут для всех методов внутри этого контроллера.
  - **@Get()**: Декоратор, который определяет метод как обработчик GET-запросов для маршрута `/books`.
- - **@Get('my')**: Декоратор, который определяет метод как обработчик DELETE-запросов для маршрута `/books/my`.
+ - **@Get('my')**: Декоратор, который определяет метод как обработчик GET-запросов для маршрута `/books/my`.
 
 ## 2. Реализация CRUD операций в контроллере
    Давайте расширим наш контроллер и добавим в него методы для выполнения операций CRUD (Create, Read, Update, Delete) с книгами.
