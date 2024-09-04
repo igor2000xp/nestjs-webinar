@@ -62,6 +62,9 @@ export class Book extends BaseEntity {
 
     @Column({ nullable: true })
     ownerId: number; //id пользователя, который добавил книгу
+
+    @Column({ nullable: true })
+    image?: string;
 }
 
 ```
@@ -120,7 +123,7 @@ export class BooksRepository {
     return this.booksORMRepository.find();
   }
 
-  async findOne(id: number): Promise<Book> {
+  async findOneOrNotFoundFail(id: number): Promise<Book> {
     const result = await this.booksORMRepository.findOne({ where: { id } });
 
     if (!result) {

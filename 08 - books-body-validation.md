@@ -33,6 +33,10 @@ export class CreateBookDto {
 
     @IsString()
     author: string;
+
+    @IsOptional()
+    @IsString()
+    image?: string;
 }
 
 ```
