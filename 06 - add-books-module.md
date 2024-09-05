@@ -83,14 +83,14 @@ nest g module modules/books
 Для создания контроллера Books выполните команду:
 
 ```bash
-nest g controller modules/books
+nest g controller modules/books --no-spec
 ```
 
 ### 3.3 Генерация сервиса
 Для создания сервиса Books выполните команду:
 
 ```bash
-nest g service modules/books
+nest g service modules/books --no-spec
 ```
 
 ### 3.4 Создание и регистрация собственного репозитория
