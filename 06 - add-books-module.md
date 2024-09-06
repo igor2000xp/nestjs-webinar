@@ -79,12 +79,214 @@ nest g controller modules/users --no-spec
 nest g service modules/users --no-spec
 ```
 
+### 0.4 Create src/modules/users/user.entity.ts
 
 ```typescript
+import { Column, Entity } from 'typeorm';
+import { BaseEntity } from '../../core/entity/base.entity';
+
+@Entity('users')
+export class User extends BaseEntity {
+  @Column()
+  name: string;
+
+  @Column({ unique: true })
+  email: string;
+
+  @Column()
+  age: number;
+
+  @Column()
+  passwordHash: string;
+}
+```
+### 0.5 Create src/modules/users/users.repository.ts
+
+```typescript
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { User } from './user.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+
+@Injectable()
+export class UsersRepository {
+  constructor(
+    @InjectRepository(User)
+    private usersOrmRepository: Repository<User>,
+  ) {}
+  async save(user: User): Promise<User> {
+    const result = await this.usersOrmRepository.save(user);
+
+    return result;
+  }
+
+  findByEmail(email: string) {
+    return this.usersOrmRepository.findOneBy({ email });
+  }
+
+  async findByIdOrNotFoundFail(id: number) {
+    const result = await this.usersOrmRepository.findOneBy({ id });
+
+    if (!result) {
+      throw new NotFoundException('user not found');
+    }
+
+    return result;
+  }
+
+  findAll() {
+    return this.usersOrmRepository.find();
+  }
+}
 
 ```
+## 0.5 Change src/modules/users/users.module.ts
 
-### Change src/app.module.ts
+```typescript
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersRepository } from './users.repository';
+import { UsersController } from './users.controller';
+import { User } from './user.entity';
+import { UsersService } from './users.service';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([User])],
+  controllers: [UsersController],
+  providers: [UsersRepository, UsersService],
+})
+export class UsersModule {}
+```
+
+## 0.6 Change src/modules/users/users.controller.ts
+
+```typescript
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { RegisterUserDto } from './dto/register-user.dto';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly userService: UsersService) {}
+
+  @Post('registration')
+  registerUser(@Body() dto: RegisterUserDto) {
+    return this.userService.registerUser(dto);
+  }
+
+  @Get()
+  getAlUsers() {
+    return this.userService.getAllUsers();
+  }
+}
+```
+
+## 0.7.0 Create src/modules/users/dto/register-user.dto.ts
+
+```typescript
+export type RegisterUserDto = {
+  name: string;
+  email: string;
+  age: number;
+  password: string;
+};
+```
+
+## 0.7 Change src/modules/users/users.service.ts
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { User } from './user.entity';
+import { UsersRepository } from './users.repository';
+import { RegisterUserDto } from './dto/register-user.dto';
+import bcrypt from 'bcrypt';
+
+@Injectable()
+export class UsersService {
+  constructor(private usersRepository: UsersRepository) {}
+  async registerUser(dto: RegisterUserDto): Promise<number> {
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const user = new User();
+    user.age = dto.age;
+    user.email = dto.email;
+    user.name = dto.name;
+    user.passwordHash = passwordHash;
+
+    const createdUser = await this.usersRepository.save(user);
+
+    return createdUser.id;
+  }
+
+  getAllUsers() {
+    return this.usersRepository.findAll();
+  }
+}
+```
+
+## 0.8 Change src/modules/users/users.controller.ts
+
+```typescript
+import { Body, Controller, Get, Post } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { RegisterUserDto } from './dto/register-user.dto';
+
+@Controller('users')
+export class UsersController {
+  constructor(private readonly userService: UsersService) {}
+
+  @Post('registration')
+  registerUser(@Body() dto: RegisterUserDto) {
+    return this.userService.registerUser(dto);
+  }
+
+  @Get()
+  getAlUsers() {
+    return this.userService.getAllUsers();
+  }
+}
+```
+
+## 0.9 Change src/main.ts
+
+```typescript
+// import { NestFactory } from '@nestjs/core';
+// import { AppModule } from './app.module';
+//
+// async function bootstrap() {
+//   const app = await NestFactory.create(AppModule);
+//   await app.listen(3000);
+// }
+// bootstrap();
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
+import { ConfigurationType } from './core/config/configurationType';
+import { ValidationPipe } from '@nestjs/common';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  //подключение глобального валидационного pipe https://docs.nestjs.com/techniques/validation
+  app.useGlobalPipes(new ValidationPipe());
+
+  //разрешены запросы с любых доменов
+  app.enableCors({
+    origin: '*', // Разрешает запросы с любых доменов
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Разрешенные методы
+    credentials: true, // Включает передачу cookies
+  });
+
+  //получение конфиг сервиса https://docs.nestjs.com/techniques/configuration#using-in-the-maints
+  const configService = app.get(ConfigService<ConfigurationType>);
+  const port = configService.get('apiSettings.PORT', { infer: true })!;
+
+  await app.listen(port);
+}
+bootstrap();
+```
+
+## 0.10 Change src/app.module.ts
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -135,64 +337,7 @@ import { UsersModule } from './modules/users/users.module';
 export class AppModule {}
 ```
 
-
-```typescript
-```
-
-## 2. Создание сущности `base` and `Book` 
-## 2.0.0 Описание сущности `Base`
-
-Начнем с создания сущности `Base`:
-Создайте новый файл `base.entity.ts` в директории `core/entity/`.
-Опишите сущность следующим образом:
-
-```typescript
-import {
-  CreateDateColumn,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
-
-export class BaseEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @CreateDateColumn({ default: new Date() })
-  createdAt: Date;
-
-  @UpdateDateColumn({ nullable: true, default: null })
-  updatedAt: Date;
-}
-
-```
-
-### 2.0 Описание сущности `Base`
-
-Начнем с создания сущности `Base`:
-Создайте новый файл `base.entity.ts` в директории `core/entity/`.
-Опишите сущность следующим образом:
-
-```typescript
-import {
-  CreateDateColumn,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
-
-export class BaseEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @CreateDateColumn({ default: new Date() })
-  createdAt: Date;
-
-  @UpdateDateColumn({ nullable: true, default: null })
-  updatedAt: Date;
-}
-
-```
-
-### 2.0.1 Create config - src/core/config/configurationType.ts
+## 0.11 Create config - src/core/config/configurationType.ts
 
 ```typescript
 import process from 'process';
@@ -215,14 +360,37 @@ const getSettings = () => ({
 export default getSettings;
 ```
 
+## 2. Создание сущности `Base` and `Book` 
+### 2.0.0 Описание сущности `Base`
 
-Создаем сущность `Book`, которая будет хранить информацию о книгах в нашей базе данных.
-В нашем проекте мы используем **code first** подход. То есть описываем данные, которые будет храниться с БД
-с помощью классов в коде. Эти классы с помощью ORM, будут превращены в таблицы в БД.
+Начнем с создания сущности `Base`:
+Создайте новый файл `base.entity.ts` в директории `core/entity/`.
+Опишите сущность следующим образом:
 
-### 2.1 Описание сущности `Book`
+```typescript
+import {
+  CreateDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-Создайте новый файл `books.entity.ts` в директории `src/modules/books/`. 
+export class BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @CreateDateColumn({ default: new Date() })
+  createdAt: Date;
+
+  @UpdateDateColumn({ nullable: true, default: null })
+  updatedAt: Date;
+}
+
+```
+
+### 2.0.1 Описание сущности `Book`
+
+Начнем с создания сущности `Base`:
+Создайте новый файл `book.entity.ts` в директории `src/modules/books/`.
 Опишите сущность следующим образом:
 
 ```typescript
@@ -250,7 +418,14 @@ export class Book extends BaseEntity {
     image?: string;
 }
 
+
 ```
+
+
+Создаем сущность `Book`, которая будет хранить информацию о книгах в нашей базе данных.
+В нашем проекте мы используем **code first** подход. То есть описываем данные, которые будет храниться с БД
+с помощью классов в коде. Эти классы с помощью ORM, будут превращены в таблицы в БД.
+
 
 ## 3. Создание модуля, контроллера, сервиса и репозитория для Books
    Теперь мы используем Nest CLI для генерации необходимых файлов и классов для работы с сущностью Books.
