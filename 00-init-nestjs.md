@@ -46,3 +46,15 @@ npm install -D @types/passport-jwt @types/passport-local
 ```
 
 # Create branch 01-start-project
+## add .env file
+```bash
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=bookstall   # Имя вашей базы данных
+DB_USER=postgres    # Имя пользователя базы данных
+DB_PASSWORD=some-password    # Пароль пользователя базы данных
+DB_TYPE=postgres
+
+PORT=5001 #порт приложения
+
+```
