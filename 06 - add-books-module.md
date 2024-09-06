@@ -399,6 +399,7 @@ import { UsersModule } from './modules/users/users.module';
 export class AppModule {}
 ```
 
+
 ## 3. Создание модуля, контроллера, сервиса и репозитория для Books
    Теперь мы используем Nest CLI для генерации необходимых файлов и классов для работы с сущностью Books.
 
