@@ -31,9 +31,192 @@ nest --version
 что позволит вам использовать его для создания модулей, 
 контроллеров, сервисов и других компонентов проекта.
 
-## 2. Создание сущности `Book`
+## 2.0.0 Описание project template:
 
-Начнем с создания сущности `Book`, которая будет хранить информацию о книгах в нашей базе данных.
+### src/core/config/configurationType.ts
+```typescript
+import process from 'process';
+
+export type ConfigurationType = ReturnType<typeof getSettings>;
+const getSettings = () => ({
+apiSettings: {
+PORT: Number.parseInt(process.env.PORT!),
+},
+dbSettings: {
+DB_NAME: process.env.DB_NAME,
+DB_HOST: process.env.DB_HOST,
+DB_PORT: Number.parseInt(process.env.DB_PORT!),
+DB_TYPE: process.env.DB_TYPE,
+USERNAME: process.env.DB_USER,
+PASSWORD: process.env.DB_PASSWORD,
+},
+});
+
+export default getSettings;
+```
+### 03. Создание модуля, контроллера, сервиса и репозитория для Users
+Теперь мы используем Nest CLI для генерации необходимых файлов и классов для работы с сущностью Books.
+
+### 3.1 Генерация модуля
+Для создания модуля users выполните команду:
+
+```bash
+nest g module modules/users
+```
+
+### 3.2 Генерация контроллера
+Для создания контроллера Books выполните команду:
+
+```bash
+nest g controller modules/users --no-spec
+```
+
+
+### 3.3 Генерация сервиса
+Для создания сервиса Books выполните команду:
+
+```bash
+nest g service modules/users --no-spec
+```
+
+
+```typescript
+
+```
+
+### Change src/app.module.ts
+
+```typescript
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import configuration, {
+  ConfigurationType,
+} from './core/config/configurationType';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersModule } from './modules/users/users.module';
+
+@Module({
+  imports: [
+    //подключение и настройка конфиг модуля из пакета @nestjs/config
+    //в файле configuration указаны переменные окружения https://docs.nestjs.com/techniques/configuration
+    ConfigModule.forRoot({
+      load: [configuration],
+    }),
+
+    //подключение и настройка базы данных
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<ConfigurationType>) => {
+        const databaseSettings = configService.get('dbSettings', {
+          infer: true,
+        })!;
+
+        return {
+          type: 'postgres',
+          host: databaseSettings.DB_HOST,
+          port: databaseSettings.DB_PORT,
+          username: databaseSettings.USERNAME,
+          password: databaseSettings.PASSWORD,
+          database: databaseSettings.DB_NAME,
+          autoLoadEntities: true,
+          synchronize: true,
+          logger: 'debug',
+        };
+      },
+    }),
+    UsersModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+
+```typescript
+```
+
+## 2. Создание сущности `base` and `Book` 
+## 2.0.0 Описание сущности `Base`
+
+Начнем с создания сущности `Base`:
+Создайте новый файл `base.entity.ts` в директории `core/entity/`.
+Опишите сущность следующим образом:
+
+```typescript
+import {
+  CreateDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+export class BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @CreateDateColumn({ default: new Date() })
+  createdAt: Date;
+
+  @UpdateDateColumn({ nullable: true, default: null })
+  updatedAt: Date;
+}
+
+```
+
+### 2.0 Описание сущности `Base`
+
+Начнем с создания сущности `Base`:
+Создайте новый файл `base.entity.ts` в директории `core/entity/`.
+Опишите сущность следующим образом:
+
+```typescript
+import {
+  CreateDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+export class BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @CreateDateColumn({ default: new Date() })
+  createdAt: Date;
+
+  @UpdateDateColumn({ nullable: true, default: null })
+  updatedAt: Date;
+}
+
+```
+
+### 2.0.1 Create config - src/core/config/configurationType.ts
+
+```typescript
+import process from 'process';
+
+export type ConfigurationType = ReturnType<typeof getSettings>;
+const getSettings = () => ({
+    apiSettings: {
+        PORT: Number.parseInt(process.env.PORT!),
+    },
+    dbSettings: {
+        DB_NAME: process.env.DB_NAME,
+        DB_HOST: process.env.DB_HOST,
+        DB_PORT: Number.parseInt(process.env.DB_PORT!),
+        DB_TYPE: process.env.DB_TYPE,
+        USERNAME: process.env.DB_USER,
+        PASSWORD: process.env.DB_PASSWORD,
+    },
+});
+
+export default getSettings;
+```
+
+
+Создаем сущность `Book`, которая будет хранить информацию о книгах в нашей базе данных.
 В нашем проекте мы используем **code first** подход. То есть описываем данные, которые будет храниться с БД
 с помощью классов в коде. Эти классы с помощью ORM, будут превращены в таблицы в БД.
 

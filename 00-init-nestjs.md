@@ -40,7 +40,7 @@ nest new nestjs-books-backend --directory ./
 # Add dependencies:
 
 ```bash
-npm install @nestjs/jwt @nestjs/mapped-types @nestjs/passport @nestjs/typeorm @types/bcrypt bcrypt class-transformer
+npm install @nestjs/jwt @nestjs/mapped-types @nestjs/passport @nestjs/typeorm @types/bcrypt bcrypt class-transformer @nestjs/config
 npm install class-validator passport passport-jwt passport-local pg reflect-metadata typeorm
 npm install -D @types/passport-jwt @types/passport-local
 ```
