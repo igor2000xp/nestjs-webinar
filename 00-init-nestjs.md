@@ -14,7 +14,7 @@ git init
 git add README.md
 git commit -m "first commit"
 git branch -M main
-git remote add origin https://github.com/igor2000xp/nestjs-books-backend.git
+git remote add origin https://github.com/your-name/nestjs-books-backend.git
 git push -u origin main
 ```
 Delete README.md
