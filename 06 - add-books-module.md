@@ -54,6 +54,68 @@ PASSWORD: process.env.DB_PASSWORD,
 
 export default getSettings;
 ```
+
+## 2. Создание сущности `Base` and `Book`
+### 2.0.0 Описание сущности `Base`
+
+Начнем с создания сущности `Base`:
+Создайте новый файл `base.entity.ts` в директории `core/entity/`.
+Опишите сущность следующим образом:
+
+```typescript
+import {
+  CreateDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+export class BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @CreateDateColumn({ default: new Date() })
+  createdAt: Date;
+
+  @UpdateDateColumn({ nullable: true, default: null })
+  updatedAt: Date;
+}
+
+```
+
+### 2.0.1 Описание сущности `Books`
+
+Начнем с создания сущности `Base`:
+Создайте новый файл `books.entity.ts` в директории `src/modules/books/`.
+Опишите сущность следующим образом:
+
+```typescript
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { BaseEntity } from '../../core/config/entity/base.entity';
+
+@Entity('books')
+export class Book extends BaseEntity {
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column()
+    title: string;
+
+    @Column()
+    author: string;
+
+    @Column()
+    ageRestriction: number; //возрастные ограничения на книгу
+
+    @Column({ nullable: true })
+    ownerId: number; //id пользователя, который добавил книгу
+
+    @Column({ nullable: true })
+    image?: string;
+}
+
+
+```
+
 ### 03. Создание модуля, контроллера, сервиса и репозитория для Users
 Теперь мы используем Nest CLI для генерации необходимых файлов и классов для работы с сущностью Books.
 
@@ -268,7 +330,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   //подключение глобального валидационного pipe https://docs.nestjs.com/techniques/validation
-  app.useGlobalPipes(new ValidationPipe());
+    app.useGlobalPipes(new ValidationPipe({ transform: true }));
 
   //разрешены запросы с любых доменов
   app.enableCors({
@@ -360,73 +422,6 @@ const getSettings = () => ({
 export default getSettings;
 ```
 
-## 2. Создание сущности `Base` and `Book` 
-### 2.0.0 Описание сущности `Base`
-
-Начнем с создания сущности `Base`:
-Создайте новый файл `base.entity.ts` в директории `core/entity/`.
-Опишите сущность следующим образом:
-
-```typescript
-import {
-  CreateDateColumn,
-  PrimaryGeneratedColumn,
-  UpdateDateColumn,
-} from 'typeorm';
-
-export class BaseEntity {
-  @PrimaryGeneratedColumn()
-  id: number;
-
-  @CreateDateColumn({ default: new Date() })
-  createdAt: Date;
-
-  @UpdateDateColumn({ nullable: true, default: null })
-  updatedAt: Date;
-}
-
-```
-
-### 2.0.1 Описание сущности `Book`
-
-Начнем с создания сущности `Base`:
-Создайте новый файл `book.entity.ts` в директории `src/modules/books/`.
-Опишите сущность следующим образом:
-
-```typescript
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
-import { BaseEntity } from '../../core/config/entity/base.entity';
-
-@Entity('books')
-export class Book extends BaseEntity {
-    @PrimaryGeneratedColumn()
-    id: number;
-
-    @Column()
-    title: string;
-
-    @Column()
-    author: string;
-
-    @Column()
-    ageRestriction: number; //возрастные ограничения на книгу
-
-    @Column({ nullable: true })
-    ownerId: number; //id пользователя, который добавил книгу
-
-    @Column({ nullable: true })
-    image?: string;
-}
-
-
-```
-
-
-Создаем сущность `Book`, которая будет хранить информацию о книгах в нашей базе данных.
-В нашем проекте мы используем **code first** подход. То есть описываем данные, которые будет храниться с БД
-с помощью классов в коде. Эти классы с помощью ORM, будут превращены в таблицы в БД.
-
-
 ## 3. Создание модуля, контроллера, сервиса и репозитория для Books
    Теперь мы используем Nest CLI для генерации необходимых файлов и классов для работы с сущностью Books.
 
@@ -500,7 +495,7 @@ export class BooksRepository {
 #### 3.4.2 Регистрация репозитория
 Откройте файл `books.module.ts`, который находится в src/modules/books/, 
 и добавьте регистрацию репозитория в модуле:
-```
+```TypeScript
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BooksService } from './books.service';
