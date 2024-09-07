@@ -29,7 +29,14 @@
 Создайте файл `create-book.dto.ts` в директории `src/modules/books/dto/`:
 
 ```typescript
-import { IsInt, IsString, Max, Min, MinLength } from 'class-validator';
+import {
+    IsInt,
+    IsOptional,
+    IsString,
+    Max,
+    Min,
+    MinLength,
+} from 'class-validator';
 
 export class CreateBookDto {
     @IsString()
@@ -97,7 +104,7 @@ export class UpdateBookDto {
 
 ```typescript
   @Post()
-async createBook(@Body() bookDto: CreateBookDto) {
+  async createBook(@Body() bookDto: CreateBookDto) {
     // необходимо вызвать соответствующий метод сервиса и вернуть результат
     await this.booksService.createBook(bookDto);
 }
@@ -116,5 +123,16 @@ async updateBook(@Param('id') id: number, @Body() bookDto: UpdateBookDto) {
 ```typescript filename="main.ts"
   app.useGlobalPipes(new ValidationPipe());
 ```
+
+```typescript filename="main.ts"
+  app.useGlobalPipes(
+    new ValidationPipe({
+        forbidNonWhitelisted: true,
+        whitelist: true,
+        transform: true,
+    }),
+  );
+```
+
 
 Попробуем сделать запрос с фронта с невалидными данными и увидим ошибку, с указанием какие поля и какие значения не верны.
