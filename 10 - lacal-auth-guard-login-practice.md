@@ -1,3 +1,5 @@
+# Create 10-lacal-auth-guard-login-practice-theory branch
+
 # login пользователя
 
 ## 1. Создание Auth модуля
@@ -14,6 +16,12 @@ nest g resource modules/auth --no-spec
 
 ## 2. Регистрация (импорт) JWT модуля в AuthModule
 
+### Install Passport and JWT if you haven't already.:
+```bash
+npm install @nestjs/jwt @nestjs/passport passport passport-jwt passport-local
+npm install -D @types/passport-jwt @types/passport-local
+```
+
 Зарегистрируем `JwtModule` и `PassportModule` в модуле `AuthModule`. 
 Добавим следующий код в массив `imports` модуля `UsersModule`:
 ```typescript
@@ -21,13 +29,50 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 //...
 
-PassportModule, 
+    PassportModule, 
     JwtModule.register({
         secret: 'secret_key', // секретный ключ (должен браться из env)
         signOptions: { expiresIn: '60m' }, // Время жизни токена
     }),
 ```
+### Case with using .env:
+```typescript
+import { Module } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigurationType } from '../../core/config/configurationType';
+import { UsersModule } from '../users/users.module';
 
+@Module({
+  imports: [
+    ConfigModule,
+    PassportModule,
+    UsersModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService<ConfigurationType>) => {
+        const databaseSettings = configService.get('apiSettings', {
+          infer: true,
+        })!;
+
+        return {
+          secret: databaseSettings.JWT_SECRET,
+          signOptions: { expiresIn: databaseSettings.JWT_EXPIRE_IN },
+        };
+      },
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService],
+})
+export class AuthModule {}
+
+
+```
 **PassportModule**: Модуль `Passport` используется для интеграции с `Passport.js`, который поддерживает различные стратегии аутентификации.
 
 **JwtModule.register**: Мы регистрируем `JwtModule` с секретным ключом и параметрами подписи.
@@ -44,6 +89,18 @@ PassportModule,
 5. Попробуем скомпилировать код и увидим **ошибку!** Что-то наподобие этого: 
 `Nest can't resolve dependencies of the AuthService (?, JwtService). Please make sure that the argument UsersRepository at index [0] is available in the AuthModule context.`
 
+```typescript auth.srvice.ts
+  async validateUser(name: string, password: string) {
+    const user = await this.usersRepository.findByEmail(name);
+    if (!user) throw new UnauthorizedException();
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) return null;
+
+    return { user: user.name };
+}
+```
+
+
 ### 3.1 Импорт модуля и массив exports
 
 Итак, если мы хотим переиспользовать провайдер (сервис, репозиторий и т.п.) из одного модуля в другом. Мы должны **экспортировать**
@@ -55,8 +112,28 @@ PassportModule,
 
 1. Добавим в массив exports модуля `UsersModule` `UsersRepository` 
 (мы хотим чтобы этот репозиторий мог быть использован снаружи, теми кто импортирует этот модуль)
-2. Импортируем `UsersModule` в `AuthModule`. Запустим и увидим что ошибки больше нет - nest разобрался со всеми зависимостями и создал все сервисы в нужном порядке!
+```typescript user.module.ts
+...
 
+@Module({
+    imports: [TypeOrmModule.forFeature([User])],
+    controllers: [UsersController],
+    providers: [UsersRepository, UsersService],
+    exports: [UsersRepository], // !!!!!!!!!!!!!!!!
+})
+
+...
+```
+2. Импортируем `UsersModule` в `AuthModule`. Запустим и увидим что ошибки больше нет - nest разобрался со всеми зависимостями и создал все сервисы в нужном порядке!
+```typescript auth.module.ts
+...
+@Module({
+    imports: [
+        ConfigModule,
+        PassportModule,
+        UsersModule,
+...
+```
 3. Теперь модули нашего приложения выглядят так: 
 
 <img width="1000" height="530" src="https://production-it-incubator.s3.eu-central-1.amazonaws.com/file-manager/Image/104d0935-73c3-4e52-a188-07f585e6b416_webirar-modules-step-2.png"/>
@@ -77,6 +154,17 @@ PassportModule,
 инжектировать в `AuthService` через конструктор. NestJs автоматически создаст нужные экземпляры
 в момент инициализации приложения:
 
+```typescript auth.service.ts
+  async login(userID: string) {
+    const user = await this.usersRepository.findByIdOrNotFoundFail(
+        Number(userID),
+    );
+    if (!user) throw new UnauthorizedException();
+
+    return { accessToken: this.jwt.sign({ userId: user.id }) };
+}
+```
+
 *Под капотом у неста:*
 ```typescript
 const userRepository = new UserRepository();
@@ -90,17 +178,48 @@ const authService = new AuthService(userRepository, jwtService);
 
 ## 5. Локальная стратегия
 
-В соответствии с [документацией nestjs passport local](https://docs.nestjs.com/recipes/passport#implementing-passport-local) создадим локальную стратегию 
+В соответствии с [документацией nestjs passport local](https://docs.nestjs.com/recipes/passport#implementing-passport-local) 
+создадим локальную стратегию 
 и добавим ее в массив `providers` модуля `AuthModule`:
 1. Создадим файл `/src/modules/auth/local.strategy.ts`
 2. Создадим класс `LocalStrategy`, наследованный от `PassportStrategy(Strategy)`,
 а лучше скопируем пример из документации :))
-3. В super() (родительский конструктор) отдадим настройку `super({ usernameField: 'email' });`,
-поскольку в качестве `username` мы используем поле `email`
-4. Метод `validate` возвращает объект, которы nestjs под капотом запишет в request.user
+3. В super() (родительский конструктор) отдадим настройку `super({ usernameField: 'email', passwordField: 'password' });`,
+поскольку в качестве `username` мы используем поле `email`, `password` - as well `password`.
+4. Метод `validate` возвращает объект, которы nestjs под капотом запишет в **request.user**
 и мы сможем прочитать его в методе контроллера, чтобы затем добавить в JWT.
+
+```typescript local.strategy.ts
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { Strategy } from 'passport-local';
+import { AuthService } from './auth.service';
+
+@Injectable()
+export class LocalStrategy extends PassportStrategy(Strategy) {
+  constructor(private authService: AuthService) {
+    super({ usernameField: 'email', passwordField: 'password' }); // By default, Passport expects fields named 'username' and 'password'
+  }
+
+  async validate(username: string, password: string): Promise<any> {
+    const user = await this.authService.validateUser(username, password);
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    return user; // The user object will be attached to req.user
+  }
+}
+
+```
+
 5. Добавим нашу локальную стратегию в массив `providers` модуля `AuthModule`, чтобы nestjs мог в 
 нужный момент внедрить нашу стратегию куда надо :))
+
+```typescript local.strategy.ts
+...
+providers: [AuthService, LocalStrategy],
+...
+```
 
 ## 6. Эндпоинт login и localAuthGuard
 
@@ -109,9 +228,109 @@ const authService = new AuthService(userRepository, jwtService);
 2. Используем декоратор `UseGuard` в который передадим `AuthGuard('local)`, в соответствии с 
 [документацией](https://docs.nestjs.com/recipes/passport#login-route).
 А лучше вынести auth guard (src/modules/auth/local-auth.guard.ts) в отдельный класс и его использовать
-```typescript
+
+```typescript auth.control.ts
+...
+@UseGuards(AuthGuard('local'))
+
+// OR if you have a user's local Guard as above
+
+import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { AuthService } from './auth.service';
+
+import {
+    ApiBadRequestResponse,
+    ApiForbiddenResponse,
+    ApiOperation,
+    ApiResponse,
+    ApiTags,
+    ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { LogoutMessage } from './dto/message-logout.dto';
+import { LocalAuthGuard } from './guards/local-auth.guard';
+import { LoginUserDto } from '../users/dto/login-user.dto';
+import { JwtService } from '@nestjs/jwt';
+
+@ApiTags('Authorization')
+@Controller('auth')
+export class AuthController {
+    constructor(
+        private readonly authService: AuthService,
+        private readonly jwt: JwtService,
+    ) {}
+
+    // @UsePipes(new ValidationPipe())
+    @UseGuards(LocalAuthGuard)
+    // @UseGuards(AuthGuard('local'))
+    @ApiOperation({ summary: 'To login you need the pass and email' })
+    @ApiResponse({
+        status: 201,
+        type: LogoutMessage,
+        description: 'Everything is OK',
+    })
+    @ApiBadRequestResponse({ description: 'Validation error' })
+    @ApiUnauthorizedResponse({ description: 'Login or password incorrect' })
+    @ApiForbiddenResponse({ description: 'User blocked' })
+    // @HttpCode(HttpStatus.OK)
+    @Post('login')
+    async login(@Request() req: { user: string }, @Body() userDto: LoginUserDto) {
+        return {
+            accessToken: this.jwt.sign({ userId: req.user, user: userDto.email }),
+        };
+    }
+```
+
+### AuthGuard
+```typescript local-auth.guard.ts
+import { Injectable } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
 @Injectable()
 export class LocalAuthGuard extends AuthGuard('local') {}
+
+```
+
+### And finally authService
+
+```typescript
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { UsersRepository } from '../users/users.repository';
+import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    private readonly jwt: JwtService,
+  ) {}
+
+  // async login(userID: string) {
+  //   const user = await this.usersRepository.findByIdOrNotFoundFail(
+  //     Number(userID),
+  //   );
+  //   if (!user) throw new UnauthorizedException();
+  //
+  //   return { accessToken: this.jwt.sign({ userId: user.id }) };
+  // }
+  async login(name: string, password: string) {
+        const user = await this.usersRepository.findByEmail(name);
+        if (!user) throw new UnauthorizedException();
+        const isValid = await this.validateUser(name, password);
+        if (!isValid) return null;
+
+        return { accessToken: this.jwt.sign({ userId: user.id }) };
+  }
+
+  async validateUser(name: string, password: string) {
+    const user = await this.usersRepository.findByEmail(name);
+    if (!user) throw new UnauthorizedException();
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) return null;
+
+    return user.id;
+  }
+}
 ```
 
 ## 7. Блок-схема login flow
