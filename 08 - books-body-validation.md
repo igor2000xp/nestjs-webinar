@@ -1,5 +1,7 @@
 # [Request lifecycle](https://docs.nestjs.com/faq/request-lifecycle#request-lifecycle) и [Валидация входных параметров в nestJS](https://docs.nestjs.com/techniques/validation#auto-validation).  
 
+# Create 08-books-body-validation branch
+
 ## 1. Request lifecycle (Жизненный цикл запроса):
 В NestJS каждый входящий запрос проходит через несколько этапов. Это включает маршрутизацию, выполнение middleware, guard, interceptor, и pipe.
 Цикл начинается с маршрутизации запроса к соответствующему контроллеру, затем запрос может быть модифицирован или отфильтрован на каждом этапе, прежде чем достигнет метода обработчика.

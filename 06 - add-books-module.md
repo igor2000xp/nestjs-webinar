@@ -35,24 +35,27 @@ nest --version
 
 ### src/core/config/configurationType.ts
 ```typescript
-import process from 'process';
-
+// import process from 'process';
+import * as process from 'process';
 export type ConfigurationType = ReturnType<typeof getSettings>;
-const getSettings = () => ({
-apiSettings: {
-PORT: Number.parseInt(process.env.PORT!),
-},
-dbSettings: {
-DB_NAME: process.env.DB_NAME,
-DB_HOST: process.env.DB_HOST,
-DB_PORT: Number.parseInt(process.env.DB_PORT!),
-DB_TYPE: process.env.DB_TYPE,
-USERNAME: process.env.DB_USER,
-PASSWORD: process.env.DB_PASSWORD,
-},
-});
+const getSettings = () => {
+  return {
+    apiSettings: {
+      PORT: parseInt(process.env.PORT!),
+    },
+    dbSettings: {
+      DB_NAME: process.env.DB_NAME,
+      DB_HOST: process.env.DB_HOST,
+      DB_PORT: parseInt(process.env.DB_PORT!),
+      DB_TYPE: process.env.DB_TYPE,
+      USERNAME: process.env.DB_USER,
+      PASSWORD: process.env.DB_PASSWORD,
+    },
+  };
+};
 
 export default getSettings;
+
 ```
 
 ## 2. Создание сущности `Base` and `Book`
@@ -355,7 +358,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import configuration, {
+import getSettings, {
   ConfigurationType,
 } from './core/config/configurationType';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -366,7 +369,8 @@ import { UsersModule } from './modules/users/users.module';
     //подключение и настройка конфиг модуля из пакета @nestjs/config
     //в файле configuration указаны переменные окружения https://docs.nestjs.com/techniques/configuration
     ConfigModule.forRoot({
-      load: [configuration],
+        isGlobal: true,
+        load: [getSettings],
     }),
 
     //подключение и настройка базы данных
