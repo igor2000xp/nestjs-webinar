@@ -63,9 +63,9 @@ if (user.age < parseInt(dto.ageRestriction)) throw new ForbiddenException('too y
 ```
 7. Проверяем на фронте
 
-![img.png](img.png)
+![img.png](img/img.png)
 
-![img_1.png](img_1.png)
+![img_1.png](img/img_1.png)
 
 #### 1.1 Инкапсуляция бизнес-логики в методах сущности
 Обратим внимание, что в текущей реализации метод сервиса одновременно работает с другими слоями (например, репозиториями) и содержит бизнес-логику приложения. 
@@ -83,6 +83,95 @@ if (user.age < parseInt(dto.ageRestriction)) throw new ForbiddenException('too y
 3. В сервисе будем вызывать метод `Book.createBook()`, передавая в него необходимые аргументы, а затем поручим репозиторию сохранить новую книгу
 4. Таким образом, детали логики создания книги будут инкапсулированы в статическом методе-фабрике, который легко можно покрыть unit-тестами
 
+### book.entity.ts
+
+```typescript
+import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { BasicEntity } from '../../core/entity/basic.entity';
+import { CreateBookDto } from './dto/create-book.dto';
+
+@Entity('books')
+export class Book extends BasicEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  title: string;
+
+  @Column()
+  author: string;
+
+  @Column()
+  ageRestriction: number; //возрастные ограничения на книгу
+
+  @Column({ nullable: true })
+  ownerId: number; //id пользователя, который добавил книгу
+
+  @Column({ nullable: true })
+  image?: string;
+
+  public static async createBook(newBook: CreateBookDto, userId: number) {
+    const book = new Book();
+    book.title = newBook.title;
+    book.author = newBook.author;
+    book.ageRestriction = parseInt(newBook.ageRestriction);
+    book.ownerId = userId;
+    book.image = newBook.image;
+    await book.save();
+    return book;
+  }
+}
+
+```
+
+### book.controller.ts
+```typescript
+@UseGuards(JwtAuthGuard)
+@Post()
+async createBook(
+    @Body() bookDto: CreateBookDto,
+    @Request() req: ReqUserPayLoadJWTInterface,
+) {
+    return await this.bookService.createBook(bookDto, req.user.userId);
+}
+```
+
+### book.service.ts
+```typescript
+  async createBook(dto: CreateBookDto, userId: string): Promise<Book> {
+    const user = await this.usersRepository.findByIdOrNotFoundFail(
+        parseInt(userId),
+    );
+    if (!user && user.age < parseInt(dto.ageRestriction))
+        throw new ForbiddenException(
+             'You are either not registered or too young, Bro',
+    );
+  return await Book.createBook(dto, user.id);
+}
+```
+### basic.entyty.ts is transformed from base.entity.ts
+
+```typescript
+import {
+  BaseEntity,
+  CreateDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
+export class BasicEntity extends BaseEntity {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @CreateDateColumn({ default: new Date() })
+  createdAt: Date;
+
+  @UpdateDateColumn({ nullable: true, default: null })
+  updatedAt: Date;
+}
+
+```
+
 ## 2 Техническое задание 2
 
 **Только тот кто добавил книгу (owner) может ее изменить. Учесть, обновление книги должно работает как patch-запрос.**
@@ -91,15 +180,58 @@ if (user.age < parseInt(dto.ageRestriction)) throw new ForbiddenException('too y
 В отличие от PUT, который обычно используется для полного обновления ресурса,
 PATCH позволяет обновить только те поля или свойства ресурса, которые изменились.*
 
-1. Создадим метод **экземпляра** класса `Book` *(??почему не статический ??)* `updateBook()` и передим нужные аргументы
+1. Создадим метод **экземпляра** класса `Book` *(??почему не статический ??)* `updateBook()` и передадим нужные аргументы
 2. Реализуем в нем нужные проверки (бизнес-требования). Не забываем про возможность частичного обновления книги.
+
+```typescript
+  public updateBook(dto: UpdateBookDto, book: Book, userId: number) {
+    if (!book) throw new BadRequestException('Something wrong wit book');
+    console.log('user', userId);
+    console.log('book', book.ownerId);
+    if (!userId || userId !== book.ownerId) {
+        throw new ForbiddenException('This is forbidden for you');
+    }
+    book.title = dto.title || book.title;
+    book.author = dto.title || book.author;
+    book.ageRestriction = parseInt(dto.ageRestriction) || book.ageRestriction;
+    book.updatedAt = new Date();
+    book.image = dto.image || book.image;
+
+    return book.save();
+}
+```
+
 3. Создадим `booksService.updateBook()`:
  - Запрашиваем искомую книгу по id. Репозиторий возвращает нам экземпляр класса `Book`.  
 *Задача репозитория: пойти в БД, достать данные, создать экземпляр сущности с данными из БД - в нашем случае мы делегировали эту работу ОРМ*
  - Вызываем метод `book.updateBook()`
  - Просим  books repository сохранить обновленную книгу
+```typescript
+  async updateBook(dto: UpdateBookDto, bookId: string, userId: string) {
+    const book = await this.booksRepository.findOneOrNotFoundFail(
+        parseInt(bookId),
+    );
+
+    return await book.updateBook(dto, book, parseInt(userId));
+}
+```
+
 4. В контроллере вешаем гард для проверки авторизации (по аналогии с созданием книги)
+
+```typescript
+@UseGuards(JwtAuthGuard)
+@Put(':id')
+async updateBook(
+    @Param('id') id: string,
+    @Request() req: ReqUserPayLoadJWTInterface,
+    @Body() bookDto: UpdateBookDto,
+) {
+    return this.bookService.updateBook(bookDto, id, req.user.userId);
+}
+```
 5. Проверяем на фронте
+
+![img.png](img/img.png)
 
 *Примечание:  
 Инкапсуляция бизнес-логики в методы сущностей не всегда возможна в полной мере. 
