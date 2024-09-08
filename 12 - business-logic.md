@@ -1,3 +1,4 @@
+# Create 12-business-logic branch
 # Бизнес логика приложения
 
 ## 1 Техническое задание 1
@@ -7,12 +8,64 @@
 Реализуем эту логику в методе `BooksService.createBook(dto: CreateBookDto)`:
 1. Добавим недостающий аргумент в метод
 2. Запросим пользователя, который делает запрос на создание книги, чтобы проверить его возраст 
+### books.service.ts
+```typescript
+    constructor(
+        private readonly booksRepository: BooksRepository,
+        private readonly usersRepository: UsersRepository,
+    ) {}
+
+  async createBook(dto: CreateBookDto, userId: string): Promise<Book> {
+    const id = parseInt(userId);
+    const user = await this.usersRepository.findByIdOrNotFoundFail(id);
+    if (!user) throw new UnauthorizedException();
+    if (user.age < parseInt(dto.ageRestriction))
+     throw new ForbiddenException('too yang, Bro');
+    const book = new Book();
+    book.title = dto.title;
+    book.author = dto.author;
+    book.ageRestriction = Number(dto.ageRestriction);
+    book.ownerId = Number(userId);
+
+    return await this.booksRepository.save(book);
+  }
+```
 3. Инжектируем нужные зависимости
+### books.module.ts
+```typescript
+@Module({
+    imports: [TypeOrmModule.forFeature([Book, User])], // !!!!!!!!!!!!!!!!! User
+    controllers: [BooksController],
+    providers: [BooksService, BooksRepository, JwtStrategy, UsersRepository], // !!!!!! UsersRepository
+})
+export class BooksModule {}
+```
+
 4. Проверяем возраст и возрастные ограничения у книги - если ОК - создаем книгу, если нет - `ForbiddenException('too yang, Bro')`
+See above in books.service.ts
+
+```typescript
+if (user.age < parseInt(dto.ageRestriction)) throw new ForbiddenException('too yang, Bro');
+```
 5. Изменим настройку `{ nullable: true }` колонки `ownerId` сущности `Book`, 
-теперь анонимный пользователь не может добавлять книги и мы будем хранить в "книге" `ownerId`
+теперь анонимный пользователь не может добавлять книги и мы будем хранить его Id в "книге" `ownerId`
+```typescript
+  @Column({ nullable: false })
+  ownerId: number; //id пользователя, который добавил книгу
+```
 6. Делаем необходимые правки в контроллере
+```typescript
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  async createBook(@Body() bookDto: CreateBookDto, @Request() req: ReqUserPayLoadJWTInterface) {
+    return await this.bookService.createBook(bookDto, req.user.userId);
+  }
+```
 7. Проверяем на фронте
+
+![img.png](img.png)
+
+![img_1.png](img_1.png)
 
 #### 1.1 Инкапсуляция бизнес-логики в методах сущности
 Обратим внимание, что в текущей реализации метод сервиса одновременно работает с другими слоями (например, репозиториями) и содержит бизнес-логику приложения. 
