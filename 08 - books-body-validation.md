@@ -25,6 +25,9 @@
  - длинна названия книги не должна быть меньше 2х символов
 
 ### 2.1 DTO для создания книги
+```bash
+npm i --save class-validator class-transformer
+```
 
 Создайте файл `create-book.dto.ts` в директории `src/modules/books/dto/`:
 
