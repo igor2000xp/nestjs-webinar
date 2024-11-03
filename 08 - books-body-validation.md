@@ -8,7 +8,7 @@
 
 ![req_lifecycle](https://production-it-incubator.s3.eu-central-1.amazonaws.com/file-manager/Image/b73e1cc9-eb2a-40fc-9097-f1d847453855_req_lifecycle.png)
 
-## 2. Создание DTO для валидации
+## 2. Создание [DTO для валидации](https://docs.nestjs.com/techniques/validation#validation)
 
 Валидация входных данных является важным аспектом разработки приложений.
 Она позволяет убедиться, что данные, полученные от клиента, соответствуют ожидаемому формату и типам,
